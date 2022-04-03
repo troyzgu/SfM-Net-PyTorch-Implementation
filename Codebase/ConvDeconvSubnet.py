@@ -6,8 +6,8 @@ import torch.nn.functional as F
 class Conv2D(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
-        self.conv = nn.Conv2D(*args, **kwargs)
-        self.batch_norm = nn.BatchNormalization2D(*args[-1])
+        self.conv = nn.Conv2d(*args, **kwargs)
+        self.batch_norm = nn.BatchNorm2d(args[-1])
 
     def forward(self, x):
         x = self.conv(x)
@@ -17,8 +17,8 @@ class Conv2D(nn.Module):
 class Deconv2D(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
-        self.conv_transpose = nn.Conv2DTranspose(*args, **kwargs)
-        self.batch_norm = nn.BatchNormalization2D(*args[-1])
+        self.conv_transpose = nn.ConvTranspose2d(*args, **kwargs)
+        self.batch_norm = nn.BatchNorm2d(args[-1])
 
     def forward(self, x):
         x = self.conv_transpose(x)
@@ -29,28 +29,28 @@ class ConvDeconvNet(nn.Module):
     def __init__(self):
         super().__init__()
         # convolution
-        kwargs = {'kernel_size':3, 'padding':'same'}
+        kwargs = {'kernel_size':3, 'padding_mode':'zeros'}
         self.input_channels = 3 # RGB(3) or grayscale(1)
         
-        self.c11 = Conv2D(self.input_channels, 32, ** kwargs)
+        self.c11 = Conv2D(self.input_channels, 32, **kwargs)
 
-        self.c21 = Conv2D(32, 64, strides=2, **kwargs)
+        self.c21 = Conv2D(32, 64, stride=2, **kwargs)
         self.c22 = Conv2D(64, 64, **kwargs)
 
-        self.c31 = Conv2D(64, 128, strides=2,  **kwargs)
+        self.c31 = Conv2D(64, 128, stride=2,  **kwargs)
         self.c32 = Conv2D(128, 128, **kwargs)
 
-        self.c41 = Conv2D(128, 256, strides=2, **kwargs)
+        self.c41 = Conv2D(128, 256, stride=2, **kwargs)
         self.c42 = Conv2D(256, 256, **kwargs)
 
-        self.c51 = Conv2D(256, 512, strides=2, **kwargs)
+        self.c51 = Conv2D(256, 512, stride=2, **kwargs)
         self.c52 = Conv2D(512, 512, **kwargs)
 
-        self.c61 = Conv2D(512, 1024, strides=2, **kwargs)
+        self.c61 = Conv2D(512, 1024, stride=2, **kwargs)
         self.c62 = Conv2D(1024, 1024, **kwargs)
 
         # deconvlution
-        kwargs = {'kernel_size': 3, 'strides': 2, 'padding': 'same'}
+        kwargs = {'kernel_size': 3, 'stride': 2}
 
         self.u5 = Deconv2D(1024, 512, **kwargs)
         self.u4 = Deconv2D(512, 256, **kwargs)

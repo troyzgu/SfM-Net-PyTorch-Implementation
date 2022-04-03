@@ -18,7 +18,7 @@ class StructureNet(nn.Module):
         super().__init__()
 
         self.cd_net = ConvDeconvNet()  # ConvDeconvNet should return 32 channels
-        self.depth = nn.Conv2D(in_channels=32, 
+        self.depth = nn.Conv2d(in_channels=32, 
                                out_channels=1, 
                                kernel_size=1) 
 

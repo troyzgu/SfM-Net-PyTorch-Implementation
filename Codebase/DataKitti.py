@@ -4,9 +4,10 @@ from typing import Any, Callable, List, Optional, Tuple
 
 from PIL import Image
 
-from .utils import download_and_extract_archive
-from .vision import VisionDataset
+# from .utils import download_and_extract_archive
+from torchvision.datasets.vision import VisionDataset
 
+import numpy as np
 
 
 class kitti_depth(VisionDataset):
@@ -21,7 +22,7 @@ class kitti_depth(VisionDataset):
             .. code::
 
                 <root>
-                    └── Kitti
+                    └── kitti_depth
                         └─ raw
                             ├── training
                             |   ├── image_2
@@ -42,11 +43,11 @@ class kitti_depth(VisionDataset):
 
     """
 
-    data_url = "https://s3.eu-central-1.amazonaws.com/avg-kitti/"
-    resources = [
-        "data_object_image_2.zip",
-        "data_object_label_2.zip",
-    ]
+    # data_url = "https://s3.eu-central-1.amazonaws.com/avg-kitti/"
+    # resources = [
+    #     "data_object_image_2.zip",
+    #     "data_object_label_2.zip",
+    # ]
     image_dir_name = "image_2"
     labels_dir_name = "label_2"
 
@@ -71,8 +72,8 @@ class kitti_depth(VisionDataset):
         self.train = train
         self._location = "training" if self.train else "testing"
 
-        if download:
-            self.download()
+        # if download:
+        #     self.download()
         if not self._check_exists():
             raise RuntimeError("Dataset not found. You may use download=True to download it.")
 
@@ -150,18 +151,18 @@ class kitti_depth(VisionDataset):
             folders.append(self.labels_dir_name)
         return all(os.path.isdir(os.path.join(self._raw_folder, self._location, fname)) for fname in folders)
 
-    def download(self) -> None:
-        """Download the KITTI data if it doesn't exist already."""
+    # def download(self) -> None:
+    #     """Download the KITTI data if it doesn't exist already."""
 
-        if self._check_exists():
-            return
+    #     if self._check_exists():
+    #         return
 
-        os.makedirs(self._raw_folder, exist_ok=True)
+    #     os.makedirs(self._raw_folder, exist_ok=True)
 
-        # download files
-        for fname in self.resources:
-            download_and_extract_archive(
-                url=f"{self.data_url}{fname}",
-                download_root=self._raw_folder,
-                filename=fname,
-            )
+    #     # download files
+    #     for fname in self.resources:
+    #         download_and_extract_archive(
+    #             url=f"{self.data_url}{fname}",
+    #             download_root=self._raw_folder,
+    #             filename=fname,
+    #         )

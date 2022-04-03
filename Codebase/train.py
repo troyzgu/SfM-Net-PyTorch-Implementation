@@ -15,7 +15,7 @@ from torch.utils.data import Dataset, DataLoader,random_split
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
-# from Kitti import kitti
+from DataKitti import kitti_depth
 from StructureNet import StructureNet
 
 import datetime
@@ -45,7 +45,7 @@ def apply(model, criterion, batch, targets, lengths):
     return pred, loss
 
 
-def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs):
+def train_model(model, optimizer, dl_train, batch_size, max_epochs):
     criterion = nn.MSELoss()
     metric_name = 'MSE'
     dfhistory = pd.DataFrame(columns = ["epoch","loss","val_loss"])
@@ -114,15 +114,21 @@ def evaluate_test_set(model, dl_test):
 def train(args):
     random.seed(args.seed)
     BATCH_SIZE = args.batch_size
+    datapath = '/mnt/back_data/Kitti/'
     """
     need to add dataset
 
     """
-    model = StructureNet()
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
-    model = train_model(model, optimizer, dl_train, dl_valid, args.batch_size, args.num_epochs)
+    KittiDataset = kitti_depth(datapath)
+    
 
-    evaluate_test_set(model, dl_test)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = StructureNet()
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+    model = train_model(model, optimizer, KittiDataset, args.batch_size, args.num_epochs)
+    model.to(device)
+
+    # evaluate_test_set(model, dl_test)
 
 
 if __name__ == '__main__':
