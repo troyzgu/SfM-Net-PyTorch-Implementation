@@ -50,7 +50,7 @@ class ConvDeconvNet(nn.Module):
         self.c62 = Conv2D(1024, 1024, **kwargs)
 
         # deconvlution
-        kwargs = {'kernel_size': 3, 'strides': 2, 'padding': 'same'}
+        kwargs = {'kernel_size': 3, 'strides': 2}
 
         self.u5 = Deconv2D(1024, 512, **kwargs)
         self.u4 = Deconv2D(512, 256, **kwargs)
