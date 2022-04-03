@@ -13,7 +13,7 @@ import os
 from ConvDeconvSubnet import ConvDeconvNet
 
 
-class StructureNet(tf.keras.Model):
+class StructureNet(nn.Module):
     def __init__(self):
         super().__init__()
 

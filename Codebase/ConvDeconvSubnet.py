@@ -7,22 +7,22 @@ class Conv2D(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.conv = nn.Conv2D(*args, **kwargs)
-        # self.batch_norm = BatchNormalization()
+        self.batch_norm = nn.BatchNormalization2D(*args[-1])
 
     def forward(self, x):
         x = self.conv(x)
-        # x = self.batch_norm(x)
+        x = self.batch_norm(x)
         return F.relu(x)
 
 class Deconv2D(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.conv_transpose = nn.Conv2DTranspose(*args, **kwargs)
-        # self.batch_norm = BatchNormalization()
+        self.batch_norm = nn.BatchNormalization2D(*args[-1])
 
     def forward(self, x):
         x = self.conv_transpose(x)
-        # x = self.batch_norm(x)
+        x = self.batch_norm(x)
         return F.relu(x)
 
 class ConvDeconvNet(nn.Module):
