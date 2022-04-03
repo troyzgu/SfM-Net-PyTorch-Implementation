@@ -9,7 +9,7 @@ from .vision import VisionDataset
 
 
 
-class Kitti(VisionDataset):
+class kitti_depth(VisionDataset):
     """`KITTI <http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark>`_ Dataset.
 
     It corresponds to the "left color images of object" dataset, for object detection.
@@ -79,11 +79,15 @@ class Kitti(VisionDataset):
         image_dir = os.path.join(self._raw_folder, self._location, self.image_dir_name)
         if self.train:
             labels_dir = os.path.join(self._raw_folder, self._location, self.labels_dir_name)
+            for img_file in os.listdir(labels_dir):
+                self.targets.append(os.path.join(labels_dir, img_file))
+        
         for img_file in os.listdir(image_dir):
             self.images.append(os.path.join(image_dir, img_file))
             if self.train:
                 self.targets.append(os.path.join(labels_dir, f"{img_file.split('.')[0]}.txt"))
-
+        
+        
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """Get item at a given index.
@@ -105,30 +109,32 @@ class Kitti(VisionDataset):
 
         """
         image = Image.open(self.images[index])
-        target = self._parse_target(index) if self.train else None
+        if self.train:
+            target = Image.open(self.targets[index])
+        # target = self._parse_target(index) if self.train else None
         if self.transforms:
             image, target = self.transforms(image, target)
         return image, target
 
 
-    def _parse_target(self, index: int) -> List:
-        target = []
-        with open(self.targets[index]) as inp:
-            content = csv.reader(inp, delimiter=" ")
-            for line in content:
-                target.append(
-                    {
-                        "type": line[0],
-                        "truncated": float(line[1]),
-                        "occluded": int(line[2]),
-                        "alpha": float(line[3]),
-                        "bbox": [float(x) for x in line[4:8]],
-                        "dimensions": [float(x) for x in line[8:11]],
-                        "location": [float(x) for x in line[11:14]],
-                        "rotation_y": float(line[14]),
-                    }
-                )
-        return target
+    # def _parse_target(self, index: int) -> List:
+    #     target = []
+    #     with open(self.targets[index]) as inp:
+    #         content = csv.reader(inp, delimiter=" ")
+    #         for line in content:
+    #             target.append(
+    #                 {
+    #                     "type": line[0],
+    #                     "truncated": float(line[1]),
+    #                     "occluded": int(line[2]),
+    #                     "alpha": float(line[3]),
+    #                     "bbox": [float(x) for x in line[4:8]],
+    #                     "dimensions": [float(x) for x in line[8:11]],
+    #                     "location": [float(x) for x in line[11:14]],
+    #                     "rotation_y": float(line[14]),
+    #                 }
+    #             )
+    #     return target
 
     def __len__(self) -> int:
         return len(self.images)

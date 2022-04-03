@@ -15,7 +15,7 @@ from torch.utils.data import Dataset, DataLoader,random_split
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
-# from Kitti import kittidata
+# from Kitti import kitti
 from StructureNet import StructureNet
 
 import datetime
