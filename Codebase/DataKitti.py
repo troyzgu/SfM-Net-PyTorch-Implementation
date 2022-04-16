@@ -6,8 +6,10 @@ from PIL import Image
 
 # from .utils import download_and_extract_archive
 from torchvision.datasets.vision import VisionDataset
+import torchvision
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class kitti_depth(VisionDataset):
@@ -86,7 +88,7 @@ class kitti_depth(VisionDataset):
         for img_file in os.listdir(image_dir):
             self.images.append(os.path.join(image_dir, img_file))
             if self.train:
-                self.targets.append(os.path.join(labels_dir, f"{img_file.split('.')[0]}.txt"))
+                self.targets.append(os.path.join(labels_dir, img_file))
         
         
 
@@ -109,13 +111,33 @@ class kitti_depth(VisionDataset):
             - rotation_y: float
 
         """
-        image = Image.open(self.images[index])
+        image = plt.imread(self.images[index])
         if self.train:
-            target = Image.open(self.targets[index])
+            target = plt.imread(self.targets[index])
+            # print("plt:", np.max(tmp_target))
+            # target = Image.open(self.targets[index])
+
         # target = self._parse_target(index) if self.train else None
-        if self.transforms:
-            image, target = self.transforms(image, target)
-        return image, target
+        # if self.transforms:
+        #     image, target = self.transforms(image, target)
+        
+        # plt.imshow(image)
+        # plt.show()
+        # plt.imshow(target)
+        # plt.show()
+        # print(np.max(target))
+        transform_method = torchvision.transforms.Compose(
+            [
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Resize((128, 384)),
+            ]
+        )
+        # image = torchvision.transforms.ToTensor(image)
+        # target = torchvision.transforms.ToTensor()(target)
+        image = transform_method(image)
+        target = transform_method(target)
+
+        return image.float().to('cuda'), target.float().to('cuda')
 
 
     # def _parse_target(self, index: int) -> List:

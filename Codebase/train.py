@@ -21,13 +21,17 @@ from StructureNet import StructureNet
 import datetime
 import pandas as pd
 
+import matplotlib.pyplot as plt
+from torchvision.transforms import Compose, ToTensor
+from torch.utils.data import Dataset,DataLoader,random_split 
+
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type=int, default=32,
+    parser.add_argument('--batch_size', type=int, default=8,
                                             help='size for each minibatch')
-    parser.add_argument('--num_epochs', type=int, default=300,
+    parser.add_argument('--num_epochs', type=int, default=20,
                                             help='maximum number of epochs')
     parser.add_argument('--learning_rate', type=float, default=0.001,
                                             help='initial learning rate')
@@ -45,41 +49,53 @@ def apply(model, criterion, batch, targets, lengths):
     return pred, loss
 
 
-def train_model(model, optimizer, dl_train, batch_size, max_epochs):
-    criterion = nn.MSELoss()
+
+class Mask_L1Loss(nn.Module):
+    def __init__(self, reduction: str = 'mean') -> None:
+        super(Mask_L1Loss, self).__init__()
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        mask = target > 0
+        result = torch.abs((input-target)*mask)
+        result = torch.sum(result)/torch.sum(mask)
+        return result
+
+
+def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs, device):
+    # criterion = nn.MSELoss(reduction='mean')
+    criterion = Mask_L1Loss()
     metric_name = 'MSE'
     dfhistory = pd.DataFrame(columns = ["epoch","loss","val_loss"])
     for epoch in range(max_epochs):
         loss_sum = 0
-        log_step_freq = 600
-        for step, (features,labels) in enumerate(dl_train, 1):
+        log_step_freq = 3
+        # step = 1
+        for step,(features,labels) in enumerate(dl_train):
+            step+=1
             optimizer.zero_grad()
             predictions = model(features)
             loss = criterion(predictions,labels)
             loss.backward()
             optimizer.step()
             loss_sum += loss.item()
-            # if step == 100:
-            #     print("train steps:")
-            #     print(loss)
-                # print(labels)
+   
             if step%log_step_freq == 0:   
                 print(("[step = %d] loss: %.3f") %
-                    (step, loss_sum/step))
+                    (step, loss_sum/((step)*batch_size)))
+
                     
         # model.eval()
         val_loss_sum = 0.0
-        for val_step, (features,labels) in enumerate(dl_train, 1):
+        val_step = 0
+        for features,labels in dl_valid:
             with torch.no_grad():
                 predictions = model(features)
                 val_loss = criterion(predictions,labels)
-                # if val_step == 100:
-                #     print("test steps:")
-                #     print(val_loss)
-                    # print(labels)
+ 
             val_loss_sum += val_loss.item()
+            val_step += 1
 
-        info = (epoch, loss_sum/step, val_loss_sum/val_step)
+        info = (epoch, loss_sum/(batch_size*step), val_loss_sum/(batch_size*val_step))
         dfhistory.loc[epoch] = info
         
         print(("\nEPOCH = %d, loss = %.3f, val_loss = %.3f, ") 
@@ -90,7 +106,7 @@ def train_model(model, optimizer, dl_train, batch_size, max_epochs):
     print('Finished Training...')
     time_finished = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     dfhistory.to_csv("train/"+time_finished+'.csv')
-    torch.save(model.state_dict(), "model/"+time_finished+'.model')
+    torch.save(model.state_dict(), "model/"+time_finished+'.pkl')
     return model
 
 
@@ -103,6 +119,10 @@ def evaluate_test_set(model, dl_test):
     for test_step, (features,labels) in enumerate(dl_test, 1):
         with torch.no_grad():
             predictions = model(features)
+            plt.imshow(predictions[0, 0,:].cpu().detach().numpy())
+            plt.show()
+            plt.imshow(labels[0, 0, :].cpu().detach().numpy())
+            plt.show()
             test_loss = criterion(predictions,labels)
             test_metric = criterion(predictions,labels)
 
@@ -119,16 +139,24 @@ def train(args):
     need to add dataset
 
     """
+    # transform_method = Compose([ToTensor()])
     KittiDataset = kitti_depth(datapath)
-    
+
+    n_train = int(len(KittiDataset)*0.9)
+    n_valid = len(KittiDataset) - n_train
+    ds_train,ds_valid = random_split(KittiDataset,[n_train,n_valid])
+
+    dl_train,dl_valid = DataLoader(ds_train,batch_size = 8),DataLoader(ds_valid,batch_size = 8)
+
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    print("Training using device: ", device)
     model = StructureNet()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
-    model = train_model(model, optimizer, KittiDataset, args.batch_size, args.num_epochs)
-    model.to(device)
+    model = model.to(device)
+    model = train_model(model, optimizer, dl_train, dl_valid, args.batch_size, args.num_epochs, device)
 
-    # evaluate_test_set(model, dl_test)
+    evaluate_test_set(model, dl_train)
 
 
 if __name__ == '__main__':
