@@ -19,6 +19,6 @@ def optical_flow(pc, camera_intrinsics=(0.5, 0.5, 1.0)):
     x_l = torch.linspace(0.0, 1.0, steps = w)
     y_l = torch.linspace(0.0, 1.0, steps = h)
     x, y = torch.meshgrid(x_l, y_l, indexing ='xy'))
-    pos = tf.stack([x, y], dim = -1)
+    pos = torch.stack([x, y], dim = -1)
     flow = points - pos
     return points, flow
