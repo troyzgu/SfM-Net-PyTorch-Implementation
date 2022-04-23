@@ -21,14 +21,24 @@ class StructureNet(nn.Module):
         self.depth = nn.Conv2d(in_channels=64, 
                                out_channels=1, 
                                kernel_size=1) 
-
+    
     def forward(self, x):
         x, _ = self.cd_net(x)
         depth = self.depth(x)
         depth = F.relu(depth)
-        # pc = depth_to_point(depth)
-        return depth
+        pc = depth_to_point(depth)
+        return depth, pc
     
-    def depth_to_point(depth, camera_intrinsics):
-        pass
-        return NotImplementedError
+def depth_to_point(depth, camera_intrinsics=(0.5, 0.5, 1.0)):
+    cx, cy, cf = camera_intrinsics
+    b, h, w, c = depth.shape # what is the last dimensin c?
+
+    x_l = torch.from_numpy(np.linspace(-cx, 1 - cx, w) / cf)
+    y_l = torch.from_numpy(np.linspace(-cy, 1 - cy, h) / cf)
+
+    x, y = torch.meshgrid(x_l, y_l)
+    f = torch.ones_like(x)
+
+    grid = torch.stack([x, y, f], -1)
+    return depth * grid
+    
