@@ -17,6 +17,7 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 
 from DataKitti import kitti_depth
 from StructureNet import StructureNet
+from MotionNet import MotionNet
 
 import datetime
 import pandas as pd
@@ -30,9 +31,9 @@ from torch.nn.functional import mse_loss
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type=int, default=64,
+    parser.add_argument('--batch_size', type=int, default=8,
                                             help='size for each minibatch')
-    parser.add_argument('--num_epochs', type=int, default=1,
+    parser.add_argument('--num_epochs', type=int, default=50,
                                             help='maximum number of epochs')
     parser.add_argument('--learning_rate', type=float, default=1e-5,
                                             help='initial learning rate')
@@ -40,7 +41,7 @@ def main():
                                             help='weight_decay rate')
     parser.add_argument('--seed', type=int, default=123,
                                             help='seed for random initialisation')
-    parser.add_argument('--load_mode', type=bool, default=True,
+    parser.add_argument('--load_mode', type=bool, default=False,
                                             help='load the existing model')
     args = parser.parse_args()
     train(args)
@@ -59,17 +60,22 @@ class Mask_L1Loss(nn.Module):
 
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         mask = target > 0
+        # mask = mask.float()
+
         print(mask.requires_grad)
         plt.imshow(mask[0, 0, :].cpu().detach().numpy())
         plt.show()
         plt.imshow(input[0, 0, :].cpu().detach().numpy())
         plt.show()
+        print(input[0, 0, 0, 0].cpu().detach().numpy())
+        print(input.dtype)
 
         plt.imshow(target[0, 0, :].cpu().detach().numpy())
         plt.show()
         result = input*mask
         plt.imshow(result[0, 0, :].cpu().detach().numpy())
         plt.show()
+
         return mse_loss(input*mask, target, reduction='mean')
 
 
@@ -83,12 +89,16 @@ def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs, de
         log_step_freq = 100
         step = 0
         for features,labels in dl_train:
+            # labels = torch.zeros_like(features)
             step += 1
             optimizer.zero_grad()
-            predictions = model(features)
+            predictions = model(features, features, step)
+            # print(predictions.dtype)
             # print(predictions)
             # print(labels)
-            loss = criterion(predictions,labels)
+
+            loss = 0
+            # loss = criterion(predictions,labels)
             loss.backward()
             optimizer.step()
             loss_sum += loss.item()
@@ -150,26 +160,22 @@ def evaluate_test_set(model, dl_test):
 def train(args):
     random.seed(args.seed)
     datapath = '/mnt/back_data/Kitti/'
-    """
-    need to add dataset
+    model_path = '/home/yjt/Documents/16833/sfmnet/runtime/model/2022_04_22_20_45_30.pkl'
 
-    """
-    model_path = '/home/yjt/Documents/16833/sfmnet/runtime/model/2022_04_19_17_59_14.pkl'
-    # transform_method = Compose([ToTensor()])
     KittiDataset = kitti_depth(datapath)
-
     n_train = int(len(KittiDataset)*0.95)
     n_valid = len(KittiDataset) - n_train
     ds_train,ds_valid = random_split(KittiDataset,[n_train,n_valid])
-
     dl_train,dl_valid = DataLoader(ds_train,batch_size = args.batch_size),DataLoader(ds_valid,batch_size = args.batch_size)
-
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Training using device: ", device)
-    model = StructureNet()
+
+    # model = StructureNet()
+    model = MotionNet()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     model = model.to(device)
+
     if (args.load_mode == True):
         model.load_state_dict(torch.load(model_path))
 

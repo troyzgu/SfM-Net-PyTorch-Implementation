@@ -25,7 +25,7 @@ class StructureNet(nn.Module):
     def forward(self, x):
         x, _ = self.cd_net(x)
         depth = self.depth(x)
-        depth = F.relu(depth) * 99 + 1
+        depth = F.relu(depth)
         # pc = depth_to_point(depth)
         return depth
     

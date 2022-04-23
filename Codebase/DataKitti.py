@@ -93,6 +93,8 @@ class kitti_depth(VisionDataset):
                     if (os.path.exists(label_file) and os.path.exists(input_file)):
                         self.targets.append(label_file)
                         self.images.append(input_file)
+                
+                break
         
         # for img_file in os.listdir(image_dir):
         #     self.images.append(os.path.join(image_dir, img_file))
