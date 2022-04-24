@@ -26,11 +26,11 @@ class Deconv2D(nn.Module):
         return F.relu(x)
 
 class ConvDeconvNet(nn.Module):
-    def __init__(self):
+    def __init__(self, input_channels = 3 ):
         super().__init__()
         # convolution
         kwargs = {'kernel_size':3, 'padding_mode':'zeros'}
-        self.input_channels = 3 # RGB(3) or grayscale(1)
+        self.input_channels = input_channels # RGB(3) or grayscale(1)
         
         self.c11 = Conv2D(self.input_channels, 32, padding = 'same', **kwargs)
 

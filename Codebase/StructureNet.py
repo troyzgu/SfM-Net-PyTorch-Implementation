@@ -29,6 +29,7 @@ class StructureNet(nn.Module):
         depth = self.depth(x)
         depth = F.relu(depth)
         pc = depth_to_point(depth)
+        pc = torch.movedim(pc, 1, 3)
         return depth, pc
     
 def depth_to_point(depth, camera_intrinsics=(0.5, 0.5, 1.0)):
@@ -43,6 +44,7 @@ def depth_to_point(depth, camera_intrinsics=(0.5, 0.5, 1.0)):
 
     grid = torch.stack([x, y, f], 0).unsqueeze(0)
     grid = grid.repeat(b, 1, 1, 1).to("cuda")
+    points = depth *grid
 
-    return depth * grid
+    return points
     

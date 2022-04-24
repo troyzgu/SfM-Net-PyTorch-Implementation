@@ -27,24 +27,9 @@ from torch.utils.data import Dataset,DataLoader,random_split
 from torch.nn.functional import mse_loss
 
 
-def forward(input, target) :
-        mask = target > 0
-        print(mask.requires_grad)
-        plt.imshow(mask[0, 0, :].cpu().detach().numpy())
-        plt.show()
-        plt.imshow(input[0, 0, :].cpu().detach().numpy())
-        plt.show()
-
-        plt.imshow(target[0, 0, :].cpu().detach().numpy())
-        plt.show()
-        result = input*mask
-        plt.imshow(result[0, 0, :].cpu().detach().numpy())
-        plt.show()
-        return mse_loss(input*mask, target, reduction='mean')
-
 
 if __name__ == "__main__":
-    input = torch.zeros(16, 3, 120, 360, dtype = torch.float32)
-    target = torch.rand(16, 3, 120, 360, dtype = torch.float32)*0.01
-    loss = forward(input, target)
-    print(loss)
+    depth = torch.rand(8, 1, 128, 384)
+    grid = torch.rand(8, 3, 128, 384)
+    points = depth*grid
+    print(points.shape)

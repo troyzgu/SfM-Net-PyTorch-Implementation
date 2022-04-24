@@ -16,6 +16,8 @@ from torch.nn.functional import grid_sample as sample
 from torch.nn.functional import mse_loss
 
 
+
+
 def warp_coordinates(points):
     '''
     input:
@@ -29,6 +31,25 @@ def warp_coordinates(points):
     warp_y = points[:,:,:,1] * (h-1.0)
     
     return torch.stack([warp_x, warp_y], dim = -1)
+
+
+class Sobel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.filter = nn.Conv2d(in_channels=1, out_channels=2, kernel_size=3, stride=1, padding=0, bias=False)
+        Gx = torch.tensor([[2.0, 0.0, -2.0], [4.0, 0.0, -4.0], [2.0, 0.0, -2.0]])
+        Gy = torch.tensor([[2.0, 4.0, 2.0], [0.0, 0.0, 0.0], [-2.0, -4.0, -2.0]])
+        G = torch.cat([Gx.unsqueeze(0), Gy.unsqueeze(0)], 0)
+        G = G.unsqueeze(1)
+        self.filter.weight = nn.Parameter(G, requires_grad=False)
+
+    def forward(self, img):
+        x = self.filter(img)
+        # x = torch.mul(x, x)
+        # x = torch.sum(x, dim=1, keepdim=True)
+        # x = torch.sqrt(x)
+        return x
+
 
 def forward_backward_consistency(d, points, pc_t):
     '''
@@ -47,18 +68,25 @@ def forward_backward_consistency(d, points, pc_t):
 
 def frame_loss(x0, x1, points):
     warp = warp_coordinates(points)
-    # warp = warp_image(x1, params)
     x1_t = sample(x1, warp, mode='bilinear', padding_mode='zeros')
-    return nn.mse(x0, x1_t)
+    return mse_loss(x0, x1_t)
 
 
 def spatial_smoothness_loss(x, order=1):
-    b, h, w, c = x.shape
-    gradients = torch.image.sobel_edges(x)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    sobel_filter = Sobel().to(device)
+    print(x.shape)
+    b, c, h, w = x.shape
+    x = x.reshape(b, 1, c*h, w)
+    gradients = sobel_filter(x)
+    print("shape of gradients:", gradients.shape)
     for i in range(order - 1):
-        gradients = torch.reshape(gradients, [b, h, w, -1])
-        gradients = torch.image.sobel_edges(gradients)
-    return torch.reduce_mean(torch.square(gradients))
+        # gradients = torch.reshape(gradients, [b, h, w, -1])
+        b, c, h, w = gradients.shape
+        gradients = gradients.reshape(b, 1, c*h, w)
+        gradients = sobel_filter(gradients)
+
+    return torch.mean(torch.square(gradients))
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 from DataKitti import kitti_depth
 from StructureNet import StructureNet
 from MotionNet import MotionNet
+from sfmnet import sfmnet
 
 import datetime
 import pandas as pd
@@ -26,7 +27,9 @@ import matplotlib.pyplot as plt
 from torchvision.transforms import Compose, ToTensor
 from torch.utils.data import Dataset,DataLoader,random_split 
 from torch.nn.functional import mse_loss
-
+from loss_func import frame_loss, spatial_smoothness_loss, forward_backward_consistency
+import warnings
+warnings.filterwarnings("ignore")
 
 
 def main():
@@ -89,17 +92,35 @@ def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs, de
         loss_sum = 0
         log_step_freq = 100
         step = 0
-        for features,labels in dl_train:
+        for features, labels in dl_train:
             # labels = torch.zeros_like(features)
             step += 1
             optimizer.zero_grad()
             # predictions = model(features, features, step)
-            predictions, _ = model(features, features, step)
-            # print(predictions.dtype)
-            # print(predictions)
-            # print(labels)
+            frame0, frame1 = features, features
+            depth, points, objs, cams, motion_map, points_2d, flow = model(frame0, frame1, step)
+            depth_inv, points_inv, objs_inv, cams_inv, motion_map_inv, points_2d_inv, flow_inv = model(frame1, frame0, step)
 
-            # loss = 0
+            frameloss = frame_loss(frame0, frame1, points)
+            frameloss_inv = frame_loss(frame1, frame0, points_inv)
+
+            smoothloss_depth = spatial_smoothness_loss(depth/100, 2)
+            smoothloss_depth_inv = spatial_smoothness_loss(depth_inv/100, 2)
+
+            smoothloss_flow = spatial_smoothness_loss(flow)
+            smoothloss_flow_inv = spatial_smoothness_loss(flow_inv)
+
+            b, h, w, k, c = motion_map.shape
+            _motion_map = motion_map.reshape(b, h, w, k*c)
+            _motion_map_inv = motion_map_inv.reshape(b, h, w, k*c)
+            smoothloss_motion = spatial_smoothness_loss(torch.movedim(_motion_map, -1, 1))
+            smoothloss_motion_inv = spatial_smoothness_loss(torch.movedim(_motion_map_inv, -1, 1))
+
+
+
+
+
+
             loss = criterion(predictions,labels)
             loss.backward()
             optimizer.step()
@@ -176,7 +197,7 @@ def train(args):
     print("Training using device: ", device)
 
     # model = StructureNet()
-    model = MotionNet()
+    model = sfmnet()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     model = model.to(device)
 

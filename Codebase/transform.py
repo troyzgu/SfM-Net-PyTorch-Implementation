@@ -10,18 +10,14 @@ def obj_transform(pc, obj_mask, obj_t, obj_p, obj_r, num_masks=3):
         obj_p 
         obj_r The rotation of the object, shape of (batch_size, 3*K)
     """
-    pc = torch.movedim(pc, 1, 3)
-    print(pc.shape)
     b, h, w, c = pc.shape
-
-    p = _pivot_point(obj_p)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    p = _pivot_point(obj_p, device)
     R = _r_mat(torch.reshape(obj_r, [-1, 3]))
-    print(p.shape)
     p = torch.reshape(p, [b, 1, 1, num_masks, 3])
     t = torch.reshape(obj_t, [b, 1, 1, num_masks, 3])
     R = torch.reshape(R, [b, 1, 1, num_masks, 3, 3])
     R = torch.tile(R, [1, h, w, 1, 1, 1])
-
     pc = torch.reshape(pc, [b, h, w, 1, 3])
     mask = torch.reshape(obj_mask, [b, h, w, num_masks, 1])
 
@@ -31,14 +27,14 @@ def obj_transform(pc, obj_mask, obj_t, obj_p, obj_r, num_masks=3):
     motion_maps = mask * pc_t
 
     pc = torch.reshape(pc, [b, h, w, 3])
-    # pc_t = pc + tf.reduce_sum(motion_maps, -2)
     pc_t = pc + torch.sum(motion_maps, -2)
     return motion_maps, pc_t
 
 def cam_transform(pc, cam_t, cam_p, cam_r):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     b, h, w, c = pc.shape
 
-    p = _pivot_point(cam_p)
+    p = _pivot_point(cam_p, device)
     R = _r_mat(cam_r)
 
     p = torch.reshape(p, [b, 1, 1, 3])
@@ -49,9 +45,9 @@ def cam_transform(pc, cam_t, cam_p, cam_r):
     pc_t = pc - p
     pc_t = _apply_r(pc_t, R)
     pc_t = pc_t + t
-    return pc_t
+    return pc_t.float()
 
-def _pivot_point(p):
+def _pivot_point(p, device):
     """
     This fucntion is used to calculate the pivot point of each object
     """
@@ -59,8 +55,8 @@ def _pivot_point(p):
     p_x = torch.sum(p, 1)
     p_y = torch.sum(p, 2)
 
-    x_l = torch.from_numpy(np.linspace(-30.0, 30.0, 30))
-    y_l = torch.from_numpy(np.linspace(-20.0, 20.0, 20))
+    x_l = torch.from_numpy(np.linspace(-30.0, 30.0, 30)).to(device)
+    y_l = torch.from_numpy(np.linspace(-20.0, 20.0, 20)).to(device)
 
     P_x = torch.sum(p_x * x_l, -1)
     P_y = torch.sum(p_y * y_l, -1)
@@ -104,9 +100,14 @@ def _r_mat(r):
     return R_x @ R_y @ R_z
 
 if __name__ == "__main__":
-    pc = torch.rand(8, 3, 128, 384)
-    obj_mask = torch.rand(8, 128, 384)
+    pc = torch.rand(8, 128, 384, 3)
+    obj_mask = torch.rand(8, 3, 128, 384)
     obj_t = torch.rand(8, 9)
     obj_p = torch.rand(8, 3, 600)
     obj_r = torch.rand(8, 9)
+
+    cam_t = torch.rand(8, 3)
+    cam_p = torch.rand(8, 1, 600)
+    cam_r = torch.rand(8, 3)
     obj_transform(pc, obj_mask, obj_t, obj_p, obj_r)
+    cam_transform(pc, cam_t, cam_p, cam_r)

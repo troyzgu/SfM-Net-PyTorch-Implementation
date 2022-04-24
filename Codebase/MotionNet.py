@@ -1,32 +1,22 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-from torchvision import datasets, transforms
-from torch.autograd import Variable
-import time
-from datetime import datetime
-
-import numpy as np
-import os
-
 from ConvDeconvSubnet import ConvDeconvNet
 
-
 class MotionNet(nn.Module):
-    def __init__(self, K=3):
+    def __init__(self, input_channel = 6, K=3):
         """
         param K: number of segmentation masks
         """
         super().__init__()
         self.num_masks = K
 
-        self.cd_net = ConvDeconvNet()
+        self.cd_net = ConvDeconvNet(input_channels=input_channel)
         # We predict object masks from the image-sized feature map of the motion 
         # network using a 1 x 1 convolutional layer with sigmoid activations.
         self.obj_mask = nn.Conv2d(64, self.num_masks, 1) 
 
-        self.d1 = nn.Linear(2 * 12 * 4 * 1024, 512) # input dimension is that of the flattened embedding layer
+        self.d1 = nn.Linear(12 * 4 * 1024, 512) # input dimension is that of the flattened embedding layer
         self.d2 = nn.Linear(512, 512)
 
         self.cam_t = nn.Linear(512, 3) 
@@ -44,10 +34,10 @@ class MotionNet(nn.Module):
         param sharpness_multiplier: a parameter that is a function of 
             the number of step for which the network has been trained
         """
-        x = torch.cat([f0, f1], -1) # depth-concatenate two frames 
+        x = torch.cat([f0, f1], 1) # depth-concatenate two frames 
         x, embedding = self.cd_net(x) # retrieve the embedding layer
-        print(self.obj_mask(x).shape)
         # 1. object mask (predicted membership probability of each pixel to each rigid motion)
+     
         obj_mask = F.sigmoid(self.obj_mask(x) * sharpness_multiplier)
         
         # Predict motion using the embedding layer
@@ -56,19 +46,17 @@ class MotionNet(nn.Module):
 
 
         embedding = torch.reshape(embedding, [nbatch, -1]) # flatten the layer except the batch
+        
         embedding = self.d1(embedding)
         embedding = self.d2(embedding)
         
         # 2. object motion
         obj_t = self.obj_t(embedding)  # translation
-        print(obj_t.shape)
         obj_p = self.obj_p(embedding)
-        
         obj_p = torch.reshape(obj_p, [-1, self.num_masks, 600])
         obj_p = F.softmax(obj_p)  # pivot points
-        print(obj_p.shape)
         obj_r = self.obj_r(embedding)  # angles of rotation
-        print(obj_r.shape)
+
         # 3. camera pose
         cam_t = self.cam_t(embedding) # translation
         cam_p = self.cam_p(embedding) # pivot points
