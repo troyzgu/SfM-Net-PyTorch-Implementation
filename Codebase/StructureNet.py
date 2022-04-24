@@ -20,7 +20,9 @@ class StructureNet(nn.Module):
         self.cd_net = ConvDeconvNet()  # ConvDeconvNet should return 32 channels
         self.depth = nn.Conv2d(in_channels=64, 
                                out_channels=1, 
-                               kernel_size=1) 
+                               kernel_size=1)
+        # self.grid = self.depth_to_point()
+
     
     def forward(self, x):
         x, _ = self.cd_net(x)
@@ -31,14 +33,16 @@ class StructureNet(nn.Module):
     
 def depth_to_point(depth, camera_intrinsics=(0.5, 0.5, 1.0)):
     cx, cy, cf = camera_intrinsics
-    b, h, w, c = depth.shape # what is the last dimensin c?
+    b, c, h, w = depth.shape # what is the last dimensin c?
 
-    x_l = torch.from_numpy(np.linspace(-cx, 1 - cx, w) / cf)
-    y_l = torch.from_numpy(np.linspace(-cy, 1 - cy, h) / cf)
+    x_l = torch.from_numpy(np.linspace(-cx, 1 - cx, h) / cf)
+    y_l = torch.from_numpy(np.linspace(-cy, 1 - cy, w) / cf)
 
     x, y = torch.meshgrid(x_l, y_l)
     f = torch.ones_like(x)
 
-    grid = torch.stack([x, y, f], -1)
+    grid = torch.stack([x, y, f], 0).unsqueeze(0)
+    grid = grid.repeat(b, 1, 1, 1).to("cuda")
+
     return depth * grid
     

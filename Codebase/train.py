@@ -62,19 +62,20 @@ class Mask_L1Loss(nn.Module):
         mask = target > 0
         # mask = mask.float()
 
-        print(mask.requires_grad)
-        plt.imshow(mask[0, 0, :].cpu().detach().numpy())
-        plt.show()
-        plt.imshow(input[0, 0, :].cpu().detach().numpy())
-        plt.show()
-        print(input[0, 0, 0, 0].cpu().detach().numpy())
-        print(input.dtype)
+        # print(mask.requires_grad)
+        # plt.imshow(mask[0, 0, :].cpu().detach().numpy())
+        # plt.show()
+        # plt.imshow(input[0, 0, :].cpu().detach().numpy())
+        # plt.show()
+        # print(input[0, 0, 0, 0].cpu().detach().numpy())
+        # print(input.dtype)
 
-        plt.imshow(target[0, 0, :].cpu().detach().numpy())
-        plt.show()
-        result = input*mask
-        plt.imshow(result[0, 0, :].cpu().detach().numpy())
-        plt.show()
+        # plt.imshow(target[0, 0, :].cpu().detach().numpy())
+        # plt.show()
+        # result = input*mask
+        # plt.imshow(result[0, 0, :].cpu().detach().numpy())
+        # plt.show()
+        # print(input)
 
         return mse_loss(input*mask, target, reduction='mean')
 
@@ -92,13 +93,14 @@ def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs, de
             # labels = torch.zeros_like(features)
             step += 1
             optimizer.zero_grad()
-            predictions = model(features, features, step)
+            # predictions = model(features, features, step)
+            predictions, _ = model(features, features, step)
             # print(predictions.dtype)
             # print(predictions)
             # print(labels)
 
-            loss = 0
-            # loss = criterion(predictions,labels)
+            # loss = 0
+            loss = criterion(predictions,labels)
             loss.backward()
             optimizer.step()
             loss_sum += loss.item()
@@ -115,7 +117,7 @@ def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs, de
         for features,labels in dl_valid:
             val_step += 1
             with torch.no_grad():
-                predictions = model(features)
+                predictions, _ = model(features)
                 val_loss = criterion(predictions,labels)
  
             val_loss_sum += val_loss.item()
@@ -144,7 +146,9 @@ def evaluate_test_set(model, dl_test):
     test_step = 1
     for test_step, (features,labels) in enumerate(dl_test, 1):
         with torch.no_grad():
-            predictions = model(features)
+            mask = labels > 0
+            predictions = mask * model(features)
+            
             plt.imshow(predictions[0, 0,:].cpu().detach().numpy())
             plt.show()
             plt.imshow(labels[0, 0, :].cpu().detach().numpy())
@@ -160,7 +164,7 @@ def evaluate_test_set(model, dl_test):
 def train(args):
     random.seed(args.seed)
     datapath = '/mnt/back_data/Kitti/'
-    model_path = '/home/yjt/Documents/16833/sfmnet/runtime/model/2022_04_22_20_45_30.pkl'
+    model_path = '/home/yjt/Documents/16833/sfmnet/runtime/model/2022_04_23_11_47_03.pkl'
 
     KittiDataset = kitti_depth(datapath)
     n_train = int(len(KittiDataset)*0.95)

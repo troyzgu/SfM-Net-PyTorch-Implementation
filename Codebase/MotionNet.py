@@ -26,7 +26,7 @@ class MotionNet(nn.Module):
         # network using a 1 x 1 convolutional layer with sigmoid activations.
         self.obj_mask = nn.Conv2d(64, self.num_masks, 1) 
 
-        self.d1 = nn.Linear(12 * 8 * 1024, 512) # input dimension is that of the flattened embedding layer
+        self.d1 = nn.Linear(2 * 12 * 4 * 1024, 512) # input dimension is that of the flattened embedding layer
         self.d2 = nn.Linear(512, 512)
 
         self.cam_t = nn.Linear(512, 3) 
@@ -61,11 +61,14 @@ class MotionNet(nn.Module):
         
         # 2. object motion
         obj_t = self.obj_t(embedding)  # translation
+        print(obj_t.shape)
         obj_p = self.obj_p(embedding)
+        
         obj_p = torch.reshape(obj_p, [-1, self.num_masks, 600])
         obj_p = F.softmax(obj_p)  # pivot points
+        print(obj_p.shape)
         obj_r = self.obj_r(embedding)  # angles of rotation
-        
+        print(obj_r.shape)
         # 3. camera pose
         cam_t = self.cam_t(embedding) # translation
         cam_p = self.cam_p(embedding) # pivot points

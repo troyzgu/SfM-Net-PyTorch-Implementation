@@ -2,11 +2,21 @@ import torch
 import numpy as np
 
 def obj_transform(pc, obj_mask, obj_t, obj_p, obj_r, num_masks=3):
+    """
+    input:
+        pc Input points cloud, shape of (batch_size, channel = 3, height, width)
+        obj_mask The mask of the object, shape of (batch_size, K = number of the objects, height, width)
+        obj_t The translation of the object, shape of (batch_size, 3*K)
+        obj_p 
+        obj_r The rotation of the object, shape of (batch_size, 3*K)
+    """
+    pc = torch.movedim(pc, 1, 3)
+    print(pc.shape)
     b, h, w, c = pc.shape
 
     p = _pivot_point(obj_p)
     R = _r_mat(torch.reshape(obj_r, [-1, 3]))
-
+    print(p.shape)
     p = torch.reshape(p, [b, 1, 1, num_masks, 3])
     t = torch.reshape(obj_t, [b, 1, 1, num_masks, 3])
     R = torch.reshape(R, [b, 1, 1, num_masks, 3, 3])
@@ -42,6 +52,9 @@ def cam_transform(pc, cam_t, cam_p, cam_r):
     return pc_t
 
 def _pivot_point(p):
+    """
+    This fucntion is used to calculate the pivot point of each object
+    """
     p = torch.reshape(p, [-1, 20, 30])
     p_x = torch.sum(p, 1)
     p_y = torch.sum(p, 2)
@@ -90,4 +103,10 @@ def _r_mat(r):
 
     return R_x @ R_y @ R_z
 
-    
+if __name__ == "__main__":
+    pc = torch.rand(8, 3, 128, 384)
+    obj_mask = torch.rand(8, 128, 384)
+    obj_t = torch.rand(8, 9)
+    obj_p = torch.rand(8, 3, 600)
+    obj_r = torch.rand(8, 9)
+    obj_transform(pc, obj_mask, obj_t, obj_p, obj_r)
