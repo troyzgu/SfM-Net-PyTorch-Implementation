@@ -29,7 +29,16 @@ from torch.nn.functional import mse_loss
 
 
 if __name__ == "__main__":
-    depth = torch.rand(8, 1, 128, 384)
-    grid = torch.rand(8, 3, 128, 384)
-    points = depth*grid
-    print(points.shape)
+    train_path = "/home/yjt/Documents/16833/sfmnet/runtime/train/2022_04_24_12_52_12.csv"
+    content = pd.read_csv(train_path)
+    loss = content["loss"].to_numpy()
+    val_loss = content["val_loss"].to_numpy()
+    epoch = content["epoch"].to_numpy()
+    # print(epoch.to_numpy())
+    plt.plot(epoch, loss)
+    plt.plot(epoch, val_loss)
+    plt.xlabel("Epoch")
+    plt.ylabel("MSELoss")
+    plt.title("Training Loss")
+    plt.legend(("Loss of train set", "Loss of valid set"))
+    plt.savefig("TrainingLoss.png")

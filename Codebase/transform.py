@@ -28,7 +28,7 @@ def obj_transform(pc, obj_mask, obj_t, obj_p, obj_r, num_masks=3):
 
     pc = torch.reshape(pc, [b, h, w, 3])
     pc_t = pc + torch.sum(motion_maps, -2)
-    return motion_maps, pc_t
+    return motion_maps.float(), pc_t
 
 def cam_transform(pc, cam_t, cam_p, cam_r):
     device = "cuda" if torch.cuda.is_available() else "cpu"

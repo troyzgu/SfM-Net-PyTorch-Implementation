@@ -45,9 +45,6 @@ class Sobel(nn.Module):
 
     def forward(self, img):
         x = self.filter(img)
-        # x = torch.mul(x, x)
-        # x = torch.sum(x, dim=1, keepdim=True)
-        # x = torch.sqrt(x)
         return x
 
 
@@ -61,7 +58,7 @@ def forward_backward_consistency(d, points, pc_t):
     
     warp = warp_coordinates(points)
     d1_t = sample(d, warp, mode='bilinear', padding_mode='zeros')
-    Z = pc_t[:, :, :, 2:3]
+    Z = pc_t[:, :, :, 2:3].reshape(d1_t.shape)
     
     return mse_loss(d1_t / 100, Z / 100)
 
@@ -75,11 +72,9 @@ def frame_loss(x0, x1, points):
 def spatial_smoothness_loss(x, order=1):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     sobel_filter = Sobel().to(device)
-    print(x.shape)
     b, c, h, w = x.shape
     x = x.reshape(b, 1, c*h, w)
     gradients = sobel_filter(x)
-    print("shape of gradients:", gradients.shape)
     for i in range(order - 1):
         # gradients = torch.reshape(gradients, [b, h, w, -1])
         b, c, h, w = gradients.shape

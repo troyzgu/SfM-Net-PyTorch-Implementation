@@ -34,11 +34,11 @@ warnings.filterwarnings("ignore")
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type=int, default=8,
+    parser.add_argument('--batch_size', type=int, default=16,
                                             help='size for each minibatch')
-    parser.add_argument('--num_epochs', type=int, default=50,
+    parser.add_argument('--num_epochs', type=int, default=600,
                                             help='maximum number of epochs')
-    parser.add_argument('--learning_rate', type=float, default=1e-5,
+    parser.add_argument('--learning_rate', type=float, default=1e-2,
                                             help='initial learning rate')
     parser.add_argument('--weight_decay', type=float, default=1e-10,
                                             help='weight_decay rate')
@@ -82,6 +82,38 @@ class Mask_L1Loss(nn.Module):
 
         return mse_loss(input*mask, target, reduction='mean')
 
+def total_loss(frame0, frame1, model, step):
+    depth, points, objs, cams, motion_map, points_2d, flow = model(frame0, frame1, step)
+    depth_inv, points_inv, objs_inv, cams_inv, motion_map_inv, points_2d_inv, flow_inv = model(frame1, frame0, step)
+
+    frameloss = frame_loss(frame0, frame1, points_2d)
+    frameloss_inv = frame_loss(frame1, frame0, points_2d_inv)
+
+    smoothloss_depth = spatial_smoothness_loss(depth/100, 2)
+    smoothloss_depth_inv = spatial_smoothness_loss(depth_inv/100, 2)
+
+    smoothloss_flow = spatial_smoothness_loss(flow)
+    smoothloss_flow_inv = spatial_smoothness_loss(flow_inv)
+
+    b, h, w, k, c = motion_map.shape
+    _motion_map = motion_map.reshape(b, h, w, k*c)
+    _motion_map_inv = motion_map_inv.reshape(b, h, w, k*c)
+    _motion_map = torch.movedim(_motion_map, -1, 1)
+    _motion_map_inv = torch.movedim(_motion_map_inv, -1, 1)
+
+    smoothloss_motion = spatial_smoothness_loss(_motion_map)
+    smoothloss_motion_inv = spatial_smoothness_loss(_motion_map_inv)
+
+    forward_backward_loss = forward_backward_consistency(depth_inv, points_2d, points)
+    forward_backward_loss_inv = forward_backward_consistency(depth, points_2d_inv, points_inv)
+
+    # loss = frameloss + frameloss_inv + smoothloss_depth + smoothloss_depth_inv + smoothloss_flow + smoothloss_flow_inv + \
+    #     smoothloss_motion + smoothloss_motion_inv + forward_backward_loss + forward_backward_loss_inv
+
+    loss = forward_backward_loss + forward_backward_loss_inv
+
+    return loss
+
 
 def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs, device):
     # criterion = nn.MSELoss(reduction='mean')
@@ -90,38 +122,19 @@ def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs, de
     dfhistory = pd.DataFrame(columns = ["epoch","loss","val_loss"])
     for epoch in range(max_epochs):
         loss_sum = 0
-        log_step_freq = 100
+        log_step_freq = 1
         step = 0
         for features, labels in dl_train:
             # labels = torch.zeros_like(features)
             step += 1
             optimizer.zero_grad()
-            # predictions = model(features, features, step)
+            # predictions,_ = model(features)
+
             frame0, frame1 = features, features
-            depth, points, objs, cams, motion_map, points_2d, flow = model(frame0, frame1, step)
-            depth_inv, points_inv, objs_inv, cams_inv, motion_map_inv, points_2d_inv, flow_inv = model(frame1, frame0, step)
 
-            frameloss = frame_loss(frame0, frame1, points)
-            frameloss_inv = frame_loss(frame1, frame0, points_inv)
+            loss = total_loss(frame0, frame1, model, step)
 
-            smoothloss_depth = spatial_smoothness_loss(depth/100, 2)
-            smoothloss_depth_inv = spatial_smoothness_loss(depth_inv/100, 2)
-
-            smoothloss_flow = spatial_smoothness_loss(flow)
-            smoothloss_flow_inv = spatial_smoothness_loss(flow_inv)
-
-            b, h, w, k, c = motion_map.shape
-            _motion_map = motion_map.reshape(b, h, w, k*c)
-            _motion_map_inv = motion_map_inv.reshape(b, h, w, k*c)
-            smoothloss_motion = spatial_smoothness_loss(torch.movedim(_motion_map, -1, 1))
-            smoothloss_motion_inv = spatial_smoothness_loss(torch.movedim(_motion_map_inv, -1, 1))
-
-
-
-
-
-
-            loss = criterion(predictions,labels)
+            # loss = criterion(predictions,labels)
             loss.backward()
             optimizer.step()
             loss_sum += loss.item()
@@ -136,10 +149,10 @@ def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs, de
         val_loss_sum = 0.0
         val_step = 0
         for features,labels in dl_valid:
+            frame0, frame1 = features, features
             val_step += 1
             with torch.no_grad():
-                predictions, _ = model(features)
-                val_loss = criterion(predictions,labels)
+                val_loss = total_loss(frame0, frame1, model, val_step)
  
             val_loss_sum += val_loss.item()
             
@@ -168,12 +181,14 @@ def evaluate_test_set(model, dl_test):
     for test_step, (features,labels) in enumerate(dl_test, 1):
         with torch.no_grad():
             mask = labels > 0
-            predictions = mask * model(features)
-            
-            plt.imshow(predictions[0, 0,:].cpu().detach().numpy())
-            plt.show()
-            plt.imshow(labels[0, 0, :].cpu().detach().numpy())
-            plt.show()
+            predictions, _ = model(features)
+            masked_pred = predictions * mask
+            file_name = "img_{}.png".format(test_step)
+            plt.imshow(masked_pred[0, 0,:].cpu().detach().numpy())
+            plt.savefig("./img/{}".format(file_name))
+
+            # plt.imshow(labels[0, 0, :].cpu().detach().numpy())
+            # plt.show()
             test_loss = criterion(predictions,labels)
             test_metric = criterion(predictions,labels)
 
@@ -185,7 +200,7 @@ def evaluate_test_set(model, dl_test):
 def train(args):
     random.seed(args.seed)
     datapath = '/mnt/back_data/Kitti/'
-    model_path = '/home/yjt/Documents/16833/sfmnet/runtime/model/2022_04_23_11_47_03.pkl'
+    model_path = '/home/yjt/Documents/16833/sfmnet/runtime/model/2022_04_24_11_33_22.pkl'
 
     KittiDataset = kitti_depth(datapath)
     n_train = int(len(KittiDataset)*0.95)
@@ -206,7 +221,8 @@ def train(args):
 
     model = train_model(model, optimizer, dl_train, dl_valid, args.batch_size, args.num_epochs, device)
 
-    evaluate_test_set(model, dl_train)
+    testdata = DataLoader(KittiDataset, batch_size = 1)
+    evaluate_test_set(model, testdata)
 
 
 if __name__ == '__main__':
