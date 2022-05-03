@@ -44,7 +44,7 @@ def main():
                                             help='weight_decay rate')
     parser.add_argument('--seed', type=int, default=123,
                                             help='seed for random initialisation')
-    parser.add_argument('--load_mode', type=bool, default=False,
+    parser.add_argument('--load_mode', type=bool, default=True,
                                             help='load the existing model')
     args = parser.parse_args()
     train(args)
@@ -183,12 +183,11 @@ def evaluate_test_set(model, dl_test):
             mask = labels > 0
             predictions, _ = model(features)
             masked_pred = predictions * mask
-            file_name = "img_{}.png".format(test_step)
-            plt.imshow(masked_pred[0, 0,:].cpu().detach().numpy())
-            plt.savefig("./img/{}".format(file_name))
+            # file_name = "img_{}.png".format(test_step)
+            # plt.imshow(masked_pred[0, 0,:].cpu().detach().numpy(), cmap='jet')
+            # plt.axis('off')
+            # plt.savefig("./img/{}".format(file_name), bbox_inches='tight')
 
-            # plt.imshow(labels[0, 0, :].cpu().detach().numpy())
-            # plt.show()
             test_loss = criterion(predictions,labels)
             test_metric = criterion(predictions,labels)
 
@@ -211,15 +210,15 @@ def train(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Training using device: ", device)
 
-    # model = StructureNet()
-    model = sfmnet()
+    model = StructureNet()
+    # model = sfmnet()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     model = model.to(device)
 
     if (args.load_mode == True):
         model.load_state_dict(torch.load(model_path))
 
-    model = train_model(model, optimizer, dl_train, dl_valid, args.batch_size, args.num_epochs, device)
+    # model = train_model(model, optimizer, dl_train, dl_valid, args.batch_size, args.num_epochs, device)
 
     testdata = DataLoader(KittiDataset, batch_size = 1)
     evaluate_test_set(model, testdata)

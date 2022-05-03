@@ -19,6 +19,7 @@ class MotionNet(nn.Module):
         self.d1 = nn.Linear(12 * 4 * 1024, 512) # input dimension is that of the flattened embedding layer
         self.d2 = nn.Linear(512, 512)
 
+
         self.cam_t = nn.Linear(512, 3) 
         self.cam_p = nn.Linear(512, 600) 
         self.cam_r = nn.Linear(512, 3) 
@@ -27,7 +28,7 @@ class MotionNet(nn.Module):
         self.obj_p = nn.Linear(512, 600 * self.num_masks)
         self.obj_r = nn.Linear(512, 3 * self.num_masks)
         
-    def forward(self, f0, f1, sharpness_multiplier):
+    def forward(self, f0, f1, sharpness_multiplier, print_option = False):
         """
         param f0: frame 0
         param f1: frame 1
@@ -48,20 +49,30 @@ class MotionNet(nn.Module):
         embedding = torch.reshape(embedding, [nbatch, -1]) # flatten the layer except the batch
         
         embedding = self.d1(embedding)
+        embedding = F.relu(embedding)
         embedding = self.d2(embedding)
+        embedding = F.relu(embedding)
         
         # 2. object motion
-        obj_t = self.obj_t(embedding)  # translation
-        obj_p = self.obj_p(embedding)
-        obj_p = torch.reshape(obj_p, [-1, self.num_masks, 600])
-        obj_p = F.softmax(obj_p)  # pivot points
-        obj_r = self.obj_r(embedding)  # angles of rotation
+        # obj_t = self.obj_t(embedding)  # translation
+        # obj_p = self.obj_p(embedding)
+        # obj_p = torch.reshape(obj_p, [-1, self.num_masks, 600])
+        # obj_p = F.softmax(obj_p)  # pivot points
+        # obj_r = self.obj_r(embedding)  # angles of rotation
+        
+        obj_t = None  # translation
+        obj_p = None
+        obj_p = None
+        obj_p = None  # pivot points
+        obj_r = None  # angles of rotation
 
         # 3. camera pose
         cam_t = self.cam_t(embedding) # translation
         cam_p = self.cam_p(embedding) # pivot points
         cam_p = F.softmax(cam_p)
         cam_r = self.cam_r(embedding) # angles of rotation
+        if (print_option == True):
+            print("cam_r:", cam_r)
         cam_r = F.tanh(cam_r)
         
         return (obj_mask, obj_t, obj_p, obj_r), (cam_t, cam_p, cam_r)
