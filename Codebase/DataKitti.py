@@ -11,6 +11,7 @@ import torchvision
 
 import numpy as np
 import matplotlib.pyplot as plt
+from transform import r_to_homo
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -226,7 +227,7 @@ class kitti_odom(VisionDataset):
         self.targets = []
         self.root = root
         self.train = train
-
+        self._frame_dis = 1
 
         image_dir = os.path.join(self.root, self.image_dir_name)
         labels_dir = os.path.join(self.root, self.labels_dir_name)
@@ -257,6 +258,12 @@ class kitti_odom(VisionDataset):
                     }
                 )
         return target 
+    
+    def get_initial_pose(self):
+        str = self.targets[0].replace('\n', '').split(' ')
+        matrix = torch.tensor([float(i) for i in str]).reshape((3, 4)).float().to(device)
+        homo = torch.vstack((matrix, torch.tensor([0, 0, 0, 1]).reshape(1, 4).to(device)))
+        return homo
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """Get item at a given index.
@@ -277,8 +284,13 @@ class kitti_odom(VisionDataset):
             - rotation_y: float
 
         """
+        
         image_00 = plt.imread(self.images[index])
-        image_01 = plt.imread(self.images[index+1])
+        # plt.imshow(image_00)
+        # plt.show()
+        image_01 = plt.imread(self.images[index+self._frame_dis])
+        # plt.imshow(image_01)
+        # plt.show()
             
         transform_method = torchvision.transforms.Compose(
             [
@@ -291,20 +303,25 @@ class kitti_odom(VisionDataset):
         image_01 = transform_method(image_01)
 
         str_00 = self.targets[index].replace('\n', '').split(' ')
-        matrix_00 = torch.tensor([float(i) for i in str_00]).reshape((3, 4))
-        str_01 = self.targets[index+1].replace('\n', '').split(' ')
-        matrix_01 = torch.tensor([float(i) for i in str_01]).reshape((3, 4))
+        matrix_00 = torch.tensor([float(i) for i in str_00]).reshape((3, 4)).float().to(device)
+        homo_00 = torch.vstack((matrix_00, torch.tensor([0, 0, 0, 1]).reshape(1, 4).to(device)))
+        
+        str_01 = self.targets[index+self._frame_dis].replace('\n', '').split(' ')
+        matrix_01 = torch.tensor([float(i) for i in str_01]).reshape((3, 4)).float().to(device)
+        homo_01 = torch.vstack((matrix_01, torch.tensor([0, 0, 0, 1]).reshape(1, 4).to(device)))
 
-        R = torch.inverse(matrix_00[:, :3]) @ matrix_01[:, :3]
-        t = matrix_01[:, 3] - matrix_00[:, 3]
+        trans_homo = homo_01@torch.inverse(homo_00)
+
+        R = trans_homo[:3, :3]
+        t = trans_homo[:3, 3]
         # print(R)
         # print(t)
 
-        return (image_00.float().to(device), image_01.float().to(device)), (R.float().to(device), t.float().to(device))
+        return (image_00.float().to(device), image_01.float().to(device)), (R, t)
 
 
     def __len__(self) -> int:
-        return (len(self.images) - 1)
+        return (len(self.images) - self._frame_dis)
 
     # @property
     # def _raw_folder(self) -> str:

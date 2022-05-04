@@ -28,7 +28,7 @@ class MotionNet(nn.Module):
         self.obj_p = nn.Linear(512, 600 * self.num_masks)
         self.obj_r = nn.Linear(512, 3 * self.num_masks)
         
-    def forward(self, f0, f1, sharpness_multiplier, print_option = False):
+    def forward(self, f0, f1, sharpness_multiplier):
         """
         param f0: frame 0
         param f1: frame 1
@@ -71,8 +71,8 @@ class MotionNet(nn.Module):
         cam_p = self.cam_p(embedding) # pivot points
         cam_p = F.softmax(cam_p)
         cam_r = self.cam_r(embedding) # angles of rotation
-        if (print_option == True):
-            print("cam_r:", cam_r)
+        # if (print_option == True):
+        #     print("cam_r:", cam_r)
         cam_r = F.tanh(cam_r)
         
         return (obj_mask, obj_t, obj_p, obj_r), (cam_t, cam_p, cam_r)

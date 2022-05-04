@@ -94,24 +94,7 @@ class ConvDeconvNet(nn.Module):
 
         u2 = self.u2(u3)
         u2 = torch.cat([x2, u2], 1)
-        # print(u2.shape)
+
         u1 = self.u1(u2)
-        # print("shape of x1, u1:", x1.shape, u1.shape)
-        u1 = torch.cat([x1, u1], 1)
-        # u5 = torch.cat([x5, u5], -1)
-
-        # u4 = self.u4(u5)
-        # u4 = torch.cat([x4, u4], -1)
-
-        # u3 = self.u3(u4)
-        # u3 = torch.cat([x3, u3], -1)
-
-        # u2 = self.u2(u3)
-        # u2 = torch.cat([x2, u2], -1)
-        # print(u2.shape)
-        # u1 = self.u1(u2)
-        # print("shape of x1, u1:", x1.shape, u1.shape)
-        # u1 = torch.cat([x1, u1], -1)
-        
-        
+        u1 = torch.cat([x1, u1], 1)     
         return u1, embedding

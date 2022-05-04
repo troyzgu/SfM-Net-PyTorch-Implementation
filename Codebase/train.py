@@ -199,7 +199,7 @@ def evaluate_test_set(model, dl_test):
 def train(args):
     random.seed(args.seed)
     datapath = '/mnt/back_data/Kitti/'
-    model_path = '/home/yjt/Documents/16833/sfmnet/runtime/model/2022_04_24_11_33_22.pkl'
+    model_path = '/home/yjt/Documents/16833/sfmnet/runtime/model/2022_05_03_17_05_45.pkl'
 
     KittiDataset = kitti_depth(datapath)
     n_train = int(len(KittiDataset)*0.95)

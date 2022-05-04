@@ -1,5 +1,9 @@
 import torch
 import numpy as np
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+def r_to_homo(R):
+    return torch.vstack((R, torch.tensor([0, 0, 0, 1]).reshape(1, 4).to(device)))
 
 def obj_transform(pc, obj_mask, obj_t, obj_p, obj_r, num_masks=3):
     """
@@ -11,7 +15,7 @@ def obj_transform(pc, obj_mask, obj_t, obj_p, obj_r, num_masks=3):
         obj_r The rotation of the object, shape of (batch_size, 3*K)
     """
     b, h, w, c = pc.shape
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
     p = _pivot_point(obj_p, device)
     R = r_mat(torch.reshape(obj_r, [-1, 3]))
     p = torch.reshape(p, [b, 1, 1, num_masks, 3])
@@ -71,7 +75,7 @@ def _apply_r(pc, R):
     pc = torch.unsqueeze(pc, -2)
     return torch.sum(R * pc, -1)
 
-def r_mat(r, output_option = False):
+def r_mat(r):
     alpha = r[:, 0] * torch.pi
     beta = r[:, 1] * torch.pi
     gamma = r[:, 2] * torch.pi
@@ -97,13 +101,13 @@ def r_mat(r, output_option = False):
         torch.stack([zero, torch.sin(gamma), torch.cos(gamma)], -1),
     ], -2)
 
-    if(output_option == True):
-        print("angles are:")
-        print(alpha, beta, gamma)
-        print("***Rx, Ry, Rz are:")
-        print(R_x[0, :])
-        print(R_y[0, :])
-        print(R_z[0, :])
+    # if(output_option == True):
+    #     print("angles are:")
+    #     print(alpha, beta, gamma)
+    #     print("***Rx, Ry, Rz are:")
+    #     print(R_x[0, :])
+    #     print(R_y[0, :])
+    #     print(R_z[0, :])
 
     return R_x @ R_y @ R_z
 
