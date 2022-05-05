@@ -71,20 +71,16 @@ class ConvDeconvNet(nn.Module):
 
         x4 = self.c41(x3)
         x4 = self.c42(x4)
-        # print("x4 shape:", x4.shape)
+        
         x5 = self.c51(x4)
-        # print("x5 shape:", x5.shape)
         x5 = self.c52(x5)
 
         x6 = self.c61(x5)
-        # print("x6 shape:", x6.shape)
         embedding = self.c62(x6) # for motion network
-        # print("embedding shape:", embedding.shape)
+        
         # deconvlution
         u5 = self.u5(embedding)
-        # print("u5 shape:", u5.shape)
         u5 = torch.cat([x5, u5], 1)
-        # print(u5.shape)
 
         u4 = self.u4(u5)
         u4 = torch.cat([x4, u4], 1)

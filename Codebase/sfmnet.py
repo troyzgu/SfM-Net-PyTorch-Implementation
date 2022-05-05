@@ -21,7 +21,6 @@ class sfmnet(nn.Module):
         motion_map, points = obj_transform(points, obj_mask, obj_t, obj_p, obj_r)
         
         points = cam_transform(points, cam_t, cam_p, cam_r)
-        # print("type after transform:", points.dtype)
         points_2d, flow = optical_flow(points)
 
         return depth, points, objs, cams, motion_map, points_2d, flow

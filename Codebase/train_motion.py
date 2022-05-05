@@ -17,7 +17,7 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 
 from DataKitti import kitti_odom
 from StructureNet import StructureNet
-from MotionNet import MotionNet
+from pre_train_MotionNet import NewMotionNet as MotionNet
 from sfmnet import sfmnet
 
 import datetime
@@ -37,7 +37,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type=int, default=16,
+    parser.add_argument('--batch_size', type=int, default=32,
                                             help='size for each minibatch')
     parser.add_argument('--num_epochs', type=int, default=100,
                                             help='maximum number of epochs')
@@ -65,25 +65,18 @@ class TranslationLoss(nn.Module):
     def forward(self, pred_R, pred_t, target_R, target_t) -> torch.Tensor:
         B, _, _ = pred_R.shape
         diff_t = (pred_t - target_t).unsqueeze(-1)
-        # print(pred_t.shape, target_t.shape)
-        loss_t = torch.norm(diff_t)
-        # loss_t = torch.norm(torch.bmm(torch.inverse(pred_R), diff_t))
-        # loss_r = torch.norm(pred_R-target_R)
-        # print(pred_R)
-        # print(target_R)
+        loss_t = torch.norm(torch.bmm(torch.inverse(pred_R), diff_t))
 
-        error_r = torch.linalg.solve(pred_R, target_R) #torch.inverse(target_R)@pred_R
-        error_r_trace = (torch.sum(torch.diagonal(error_r, dim1 = 1, dim2 = 2), -1) - 1)/2        
-        loss_r = torch.norm(torch.arccos(torch.clamp(error_r_trace, min=-1.0, max=1.0)))
-        # eye_mask = torch.ones(3, 3).float().to(device) - torch.eye(3).float().to(device)
-        # mask = eye_mask.repeat(B, 1, 1)
-        
-        # diag_loss_r = torch.norm(torch.diagonal(target_R-pred_R, dim1 = 1, dim2 = 2))
-        # other_loss_r = torch.norm(mask*(pred_R - target_R))
-        # # print("diag loss and other entry loss:", diag_loss_r, other_loss_r)
-        # loss_r = diag_loss_r + other_loss_r * 10
 
-        return loss_t, loss_r*10
+        # this is the target loss function, but we face problems as it leads to Nan
+        # error_r = torch.linalg.solve(pred_R, target_R) #torch.inverse(target_R)@pred_R
+        # error_r_trace = (torch.sum(torch.diagonal(error_r, dim1 = 1, dim2 = 2), -1) - 1)/2        
+        # loss_r = torch.norm(torch.arccos(torch.clamp(error_r_trace, min=-1.0, max=1.0)))
+
+
+        loss_r = torch.norm((pred_R - target_R))
+
+        return loss_t + loss_r
 
 def r_print(pred_R, pred_t, target_R, target_t):
     print(pred_R[0, :])
@@ -106,8 +99,7 @@ def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs, de
             cam_t, cam_p, cam_r = trans
             pred_r = r_mat(cam_r)
             pred_t = torch.reshape(cam_t, [frame0.shape[0], 3])
-            loss_t, loss_r = criterion(pred_r, pred_t, target_r, target_t)
-            loss = loss_t + loss_r
+            loss = criterion(pred_r, pred_t, target_r, target_t)
 
             # loss = criterion(predictions,labels)
             loss.backward()
@@ -119,18 +111,18 @@ def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs, de
                     (step, loss_sum/((step)*batch_size)))
                 print("loss_t is: {}, loss_r is: {}".format(loss_t, loss_r))
                               
-        # model.eval()
+        model.eval()
         val_loss_sum = 0.0
         val_step = 1
-        # for (frame0, frame1), (target_r, target_t) in dl_valid:
-        #     with torch.no_grad():
-        #         _, trans = model(frame0, frame1, step)
-        #         cam_t, cam_p, cam_r = trans
-        #         pred_r = r_mat(cam_r)
-        #         pred_t = torch.reshape(cam_t, [frame0.shape[0], 3])
-        #         val_loss = criterion(pred_r, pred_t, target_r, target_t)
-        #     val_loss_sum += val_loss.item()
-        #     val_step += 1
+        for (frame0, frame1), (target_r, target_t) in dl_valid:
+            with torch.no_grad():
+                _, trans = model(frame0, frame1, step)
+                cam_t, cam_p, cam_r = trans
+                pred_r = r_mat(cam_r)
+                pred_t = torch.reshape(cam_t, [frame0.shape[0], 3])
+                val_loss = criterion(pred_r, pred_t, target_r, target_t)
+            val_loss_sum += val_loss.item()
+            val_step += 1
   
         info = (epoch, loss_sum/(batch_size*step), val_loss_sum/(batch_size*val_step))
         dfhistory.loc[epoch] = info
@@ -149,7 +141,6 @@ def evaluate_test_set(model, dl_test, init_pose):
     model.eval()
     criterion = TranslationLoss()
     test_loss_sum = 0.0
-    test_metric_sum = 0.0
     test_step = 1
     world_homo = init_pose
     all_data = init_pose[:3, :].reshape(-1)
@@ -159,34 +150,25 @@ def evaluate_test_set(model, dl_test, init_pose):
             cam_t, cam_p, cam_r = trans
             pred_r = r_mat(cam_r).reshape((3, 3))
             pred_t = torch.reshape(cam_t, (3, 1))
+            test_loss = criterion(pred_r, pred_t, target_r, target_t)
+            test_loss_sum += test_loss
+
             pred_homo = torch.vstack((torch.hstack((pred_r.reshape((3,3)), pred_t.reshape((3, 1)))), torch.tensor([0, 0, 0, 1]).reshape(1, 4).to(device)))
             world_homo = pred_homo@world_homo
-            if test_step % 50 == 0:
-                print("*******prediction\n")
-                print(pred_r)
-                print(pred_t)
-                print(target_r)
-                print(target_t)
-                print(world_homo)
             
             all_data = torch.vstack((all_data, world_homo[:3, :].reshape(-1)))
             test_step += 1
-
-            # test_loss = criterion(pred_r, pred_t, target_r, target_t)
-            # test_step += 1
-    np.savetxt("/home/yjt/Documents/16833/kitti-odom-eval/output_00/00.txt", all_data.detach().cpu().numpy())
-    #     test_loss_sum += test_loss.item()
-    # print("test loss is:", test_loss_sum/test_step)
+    print("test result is: ", test_loss_sum/test_step)
+    np.savetxt("/home/yjt/Documents/16833/kitti-odom-eval/output/04.txt", all_data.detach().cpu().numpy())
 
 
 def train(args):
     random.seed(args.seed)
-    # torch.random.seed(args.seed)
-    model_path = "/home/yjt/Documents/16833/sfmnet/runtime/model/2022_05_03_20_46_52.pkl"
+    model_path = "/home/yjt/Documents/16833/sfmnet/runtime/model/2022_05_04_01_06_13.pkl"
 
     KittiDataset = kitti_odom()
     init_pose = KittiDataset.get_initial_pose()
-    n_train = int(len(KittiDataset))
+    n_train = int(len(KittiDataset)*0.95)
     n_valid = len(KittiDataset) - n_train
     ds_train,ds_valid = random_split(KittiDataset,[n_train,n_valid])
     dl_train,dl_valid = DataLoader(ds_train,batch_size = args.batch_size),DataLoader(ds_valid,batch_size = args.batch_size)
@@ -195,7 +177,6 @@ def train(args):
     print("Training using device: ", device)
 
     model = MotionNet()
-    # model = sfmnet()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     # optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9)
     model = model.to(device)
