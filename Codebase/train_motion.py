@@ -110,7 +110,6 @@ def train_model(model, optimizer, dl_train, dl_valid, batch_size, max_epochs, de
             if step%log_step_freq == 0:
                 print(("[step = %d] loss: %.8f") %
                     (step, loss_sum/((step)*batch_size)))
-                print("loss_t is: {}, loss_r is: {}".format(loss_t, loss_r))
                               
         model.eval()
         val_loss_sum = 0.0
