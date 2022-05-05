@@ -50,6 +50,7 @@ def main():
                                             help='seed for random initialisation')
     parser.add_argument('--load_mode', type=bool, default=False,
                                             help='load the existing model')
+    parser.add_argument("--root_path", type = str, default = '/mnt/back_data/Kitti/')
     args = parser.parse_args()
     train(args)
 
@@ -176,7 +177,7 @@ def evaluate_test_set(model, dl_test):
 
 def train(args):
     random.seed(args.seed)
-    datapath = '/mnt/back_data/Kitti/'
+    datapath = args.root_path
     model_path = '/home/yjt/Documents/16833/sfmnet/runtime/model/2022_04_24_12_52_12.pkl'
 
     KittiDataset = kitti_depth(datapath)
